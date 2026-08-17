@@ -1,0 +1,31 @@
+@baseUrl = http://127.0.0.1:5000
+
+### List endpoints
+GET {{baseUrl}}/
+
+### Health
+GET {{baseUrl}}/api/health
+
+### Comments (first page)
+GET {{baseUrl}}/api/comments?limit=10&offset=0
+
+### Comments (next page)
+GET {{baseUrl}}/api/comments?limit=10&offset=10
+
+### Summary
+GET {{baseUrl}}/api/comments/summary
+
+### By year
+GET {{baseUrl}}/api/comments/by-year
+
+### By day
+GET {{baseUrl}}/api/comments/by-day
+
+### Longest comments
+GET {{baseUrl}}/api/comments/longest?limit=10
+
+### Repeat commenters
+GET {{baseUrl}}/api/comments/repeaters
+
+### Languages (slow on first request)
+GET {{baseUrl}}/api/comments/languages
