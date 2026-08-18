@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from get_all_comments import get_all_comments
+from get_comment import get_comment
 from get_comment_languages import get_comment_languages
 from get_comment_summary import get_comment_summary
 from get_comments_by_day import get_comments_by_day
@@ -23,6 +24,8 @@ def index():
             "endpoints": [
                 "GET /api/health",
                 "GET /api/comments?limit=100&offset=0",
+                "GET /api/comment?url=... or ?lc=...",
+                "POST /api/comment  {\"url\": \"https://www.youtube.com/watch?v=...&lc=...\"}",
                 "GET /api/comments/summary",
                 "GET /api/comments/by-year",
                 "GET /api/comments/by-day",
@@ -50,6 +53,33 @@ def comments():
     limit = request.args.get("limit", default=100, type=int)
     offset = request.args.get("offset", default=0, type=int)
     return jsonify(get_all_comments(limit=limit, offset=offset))
+
+
+def _comment_query():
+    body = request.get_json(silent=True) or {}
+    return get_comment(
+        url=body.get("url") or request.args.get("url"),
+        video=(
+            body.get("video")
+            or body.get("v")
+            or request.args.get("video")
+            or request.args.get("v")
+        ),
+        lc=(
+            body.get("lc")
+            or body.get("cid")
+            or request.args.get("lc")
+            or request.args.get("cid")
+        ),
+    )
+
+
+@app.get("/api/comment")
+@app.post("/api/comment")
+def comment():
+    payload = _comment_query()
+    status = 200 if payload.get("ok") else 404 if payload.get("lc") else 400
+    return jsonify(payload), status
 
 
 @app.get("/api/comments/summary")

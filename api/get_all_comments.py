@@ -11,7 +11,13 @@ from youtube_comment_downloader import (
     YoutubeCommentDownloader,
 )
 
-from paths import DATA_DIR, VIDEO_ID, iter_comments
+from paths import (
+    VIDEO_ID,
+    guarded_write_path,
+    iter_comments,
+    new_export_path,
+    video_id_from,
+)
 
 BAR_W = 24
 SUFFIX = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}
@@ -55,11 +61,6 @@ def relative_unit(display):
     return None
 
 
-def video_id_from(value):
-    match = re.search(r"(?:v=|youtu\.be/|/shorts/)([A-Za-z0-9_-]{11})", value)
-    return match.group(1) if match else value
-
-
 def get_all_comments(limit=100, offset=0):
     comments = []
     skipped = 0
@@ -75,7 +76,7 @@ def get_all_comments(limit=100, offset=0):
 
 def download_all_comments(video=VIDEO_ID, limit=10_000, sort="recent", language="en", out=None):
     video = video_id_from(video)
-    out_path = out or (DATA_DIR / f"{video}.jsonl")
+    out_path = guarded_write_path(out if out else new_export_path(video))
     sort_by = SORT_BY_RECENT if sort == "recent" else SORT_BY_POPULAR
     downloader = YoutubeCommentDownloader()
     seen = set()
@@ -120,7 +121,8 @@ def download_all_comments(video=VIDEO_ID, limit=10_000, sort="recent", language=
         f"video={video} sort={sort} lang={language} limit={limit or 'none'} -> {out_path}",
         flush=True,
     )
-    with open(out_path, "a", encoding="utf-8") as handle:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "x", encoding="utf-8") as handle:
         try:
             for index, comment in enumerate(
                 downloader.get_comments(video, sort_by=sort_by, language=language)
@@ -173,10 +175,13 @@ if __name__ == "__main__":
     parser.add_argument("--language", default="en")
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
-    download_all_comments(
-        video=args.video,
-        limit=args.limit,
-        sort=args.sort,
-        language=args.language,
-        out=args.out,
-    )
+    try:
+        download_all_comments(
+            video=args.video,
+            limit=args.limit,
+            sort=args.sort,
+            language=args.language,
+            out=args.out,
+        )
+    except (ValueError, FileExistsError) as exc:
+        parser.error(str(exc))

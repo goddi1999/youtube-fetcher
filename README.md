@@ -21,13 +21,16 @@ source .venv/bin/activate
 python app.py
 ```
 
-Runs at `http://127.0.0.1:5000` with CORS enabled. Analysis results (except paginated comments and longest-comments) are cached in memory after the first request.
+Runs at `http://127.0.0.1:5000` with CORS enabled. Analysis results (except paginated comments, longest-comments, and single-comment lookup) are cached in memory after the first request.
+
+`api/data/jNQXAC9IVRw.jsonl` is the **read-only comments database**. Every analysis endpoint reads it. Nothing in the API writes to it. Language detection also needs `api/lid.176.bin` (Facebook FastText) and `api/emojis.ts`.
 
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/` | Lists endpoints |
 | `GET` | `/api/health` | Liveness check |
 | `GET` | `/api/comments?limit=100&offset=0` | Paginated comments (does not dump the full file) |
+| `GET` / `POST` | `/api/comment` | Look up one comment by YouTube URL or `lc`. Returns JSON. Does not write. |
 | `GET` | `/api/comments/summary` | File totals and a sample row |
 | `GET` | `/api/comments/by-year` | Counts by year |
 | `GET` | `/api/comments/by-day` | Counts by day, ranked by comment volume |
@@ -35,7 +38,33 @@ Runs at `http://127.0.0.1:5000` with CORS enabled. Analysis results (except pagi
 | `GET` | `/api/comments/repeaters` | People who commented more than once |
 | `GET` | `/api/comments/languages` | Language breakdown. Slow on first hit: loads FastText, then caches |
 
-Comment data is `api/data/jNQXAC9IVRw.jsonl`. Language detection also needs `api/lid.176.bin` (Facebook FastText) and `api/emojis.ts`.
+### Look up a comment
+
+Paste a YouTube comment URL (the `lc=` query is the comment id). Prefer **POST** so `&lc=` is not eaten by the query string.
+
+```bash
+curl -s http://127.0.0.1:5000/api/comment \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://www.youtube.com/watch?v=jNQXAC9IVRw&lc=UgzxsAHHvWZkGR3gJVp4AaABAg"}'
+```
+
+Or look up by id only:
+
+```bash
+curl -s 'http://127.0.0.1:5000/api/comment?lc=UgzxsAHHvWZkGR3gJVp4AaABAg'
+```
+
+This **reads** the jsonl and returns one JSON object. It never appends, overwrites, or creates files.
+
+| Field | Meaning |
+|---|---|
+| `ok` | `true` if that comment is in the database |
+| `video` | Video id (`jNQXAC9IVRw` for this database) |
+| `lc` | Comment id |
+| `url` | Canonical `watch?v=…&lc=…` link |
+| `comment` | The jsonl row (same shape as a downloaded comment) |
+
+`404` if the comment is missing or the URL is for a different video. `400` if there is no `lc` / comment URL. Ready-made requests are in `api/client.http`.
 
 ## Scripts
 
@@ -43,7 +72,8 @@ Each module returns JSON-serializable data and can also be run from the command 
 
 | Script | What it does |
 |---|---|
-| `get_all_comments.py` | Download comments to JSONL, or read a page of comments |
+| `get_all_comments.py` | Download comments to a **new** JSONL under `data/exports/`, or read a page from the database |
+| `get_comment.py` | Look up one comment by YouTube URL / `lc` (used by `/api/comment`) |
 | `get_comment_summary.py` | File totals / sample row |
 | `get_comments_by_year.py` | Counts by year |
 | `get_comments_by_day.py` | Counts by day |
@@ -62,6 +92,12 @@ python get_comment_languages.py
 ```
 
 ## Download comments
+
+New scrapes **never** touch `api/data/jNQXAC9IVRw.jsonl`. The downloader refuses that path and always creates a new file:
+
+`api/data/exports/<VIDEO>.<UTC timestamp>.jsonl`
+
+If you pass `--out` pointing at the database, it errors out instead of writing.
 
 Smoke test — 10.000 comments off the default video (`jNQXAC9IVRw`, "Me at the zoo"):
 
@@ -90,7 +126,7 @@ python get_all_comments.py --limit all
 | `--video` | `jNQXAC9IVRw` | Video ID or a full URL (`https://www.youtube.com/watch?v=...`, `youtu.be/...`, `/shorts/...`) — the ID is pulled out for you. |
 | `--sort` | `recent` | `recent` or `popular`. |
 | `--language` | `en` | YouTube UI locale. **Leave this alone** — see below. |
-| `--out` | `data/<VIDEO>.jsonl` | Output path. |
+| `--out` | `data/exports/<VIDEO>.<timestamp>.jsonl` | Must be a **new** file. Cannot be the protected database. |
 
 ## Locale is the silent failure mode
 
@@ -109,7 +145,7 @@ So `--language en` is the default here and you should keep it. English gives `"6
 
 ## Output
 
-`api/data/jNQXAC9IVRw.jsonl`, one JSON object per line. The scraper's own fields, plus four added on top:
+The long scrape lives at `api/data/jNQXAC9IVRw.jsonl` and is the API's database — one JSON object per line, **read-only**. Fresh downloads land in `api/data/exports/` with the same row shape. The scraper's own fields, plus four added on top:
 
 ```json
 {"cid":"Ugx...","text":"...","time":"6 years ago","author":"@someone","channel":"UC...",
@@ -140,11 +176,13 @@ There is no exact-to-the-second `publishedAt` or true-integer `likeCount` on thi
 
 `--sort recent` streams strictly newest-first, so `stream_index` gives you a **total ordering that's exact even where the dates are far too coarse to sort by**. Ten thousand comments all stamped `"6 years ago"` collapse to one date but keep perfect relative order. Sort by `stream_index`, not `published_approx`.
 
-Opened in **append mode**, so a second run adds to the same file rather than replacing it. Dedup by `cid` only runs within a single process — if you rerun and want a clean file, delete it first, or dedup after the fact:
+Each download run creates a **new** file (`open(..., "x")`). It will not append to or replace an existing file — including the database. Dedup by `cid` only runs within a single process. To merge two export files later:
 
 ```bash
-sort -u -t'"' -k4,4 api/data/jNQXAC9IVRw.jsonl > api/data/deduped.jsonl
+sort -u -t'"' -k4,4 api/data/exports/one.jsonl api/data/exports/two.jsonl > api/data/exports/deduped.jsonl
 ```
+
+Do not redirect that onto `api/data/jNQXAC9IVRw.jsonl`.
 
 ## Progress and stopping
 

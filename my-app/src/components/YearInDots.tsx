@@ -50,7 +50,8 @@ export default function YearInDots({
   const shareLabel =
     share > 0 && share < 0.1 ? "<0.1%" : `${share.toFixed(1)}%`;
 
-  const label = `${year}: ${comments.toLocaleString()} comments (${shareLabel} of all dated comments). ${filled} of ${totalDots} dots filled relative to the busiest year.`;
+  const commentsLabel = comments.toLocaleString("en-US");
+  const label = `${year}: ${commentsLabel} comments (${shareLabel} of all dated comments). ${filled} of ${totalDots} dots filled relative to the busiest year.`;
 
   const handleClick: ComponentProps<"button">["onClick"] = (event) => {
     setReplayKey((key) => key + 1);
@@ -126,7 +127,7 @@ export default function YearInDots({
           className="flex flex-col items-end gap-0.5 animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500 delay-800 motion-reduce:animate-none"
         >
           <span className="text-[clamp(10px,1.6vw,13px)] text-muted-foreground">
-            {comments.toLocaleString()}
+            {commentsLabel}
           </span>
           <span className="text-[clamp(10px,1.5vw,12px)] text-muted-foreground">
             {shareLabel}

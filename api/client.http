@@ -12,6 +12,20 @@ GET {{baseUrl}}/api/comments?limit=10&offset=0
 ### Comments (next page)
 GET {{baseUrl}}/api/comments?limit=10&offset=10
 
+### Look up one comment from the jsonl database (POST keeps &lc= intact)
+POST {{baseUrl}}/api/comment
+Content-Type: application/json
+
+{
+  "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw&lc=UgzxsAHHvWZkGR3gJVp4AaABAg"
+}
+
+### Look up one comment by lc
+GET {{baseUrl}}/api/comment?lc=UgzxsAHHvWZkGR3gJVp4AaABAg
+
+### Look up one comment by encoded URL
+GET {{baseUrl}}/api/comment?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DjNQXAC9IVRw%26lc%3DUgzxsAHHvWZkGR3gJVp4AaABAg
+
 ### Summary
 GET {{baseUrl}}/api/comments/summary
 
