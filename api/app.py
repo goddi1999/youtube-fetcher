@@ -7,7 +7,7 @@ from get_comment_languages import get_comment_languages
 from get_comment_summary import get_comment_summary
 from get_comments_by_day import get_comments_by_day
 from get_comments_by_year import get_comments_by_year
-from get_longest_comments import get_longest_comments
+from get_longest_comments import SORT_KEYS, get_longest_comments
 from get_repeat_commenters import get_repeat_commenters
 
 app = Flask(__name__)
@@ -29,7 +29,7 @@ def index():
                 "GET /api/comments/summary",
                 "GET /api/comments/by-year",
                 "GET /api/comments/by-day",
-                "GET /api/comments/longest?limit=10",
+                "GET /api/comments/longest?limit=10&by=length|words",
                 "GET /api/comments/repeaters",
                 "GET /api/comments/languages",
             ],
@@ -100,7 +100,10 @@ def comments_by_day():
 @app.get("/api/comments/longest")
 def longest_comments():
     limit = request.args.get("limit", default=10, type=int)
-    return jsonify(get_longest_comments(limit=limit))
+    sort_by = request.args.get("by", default="length", type=str)
+    if sort_by not in SORT_KEYS:
+        return jsonify({"error": f"by must be one of {list(SORT_KEYS)}"}), 400
+    return jsonify(get_longest_comments(limit=limit, sort_by=sort_by))
 
 
 @app.get("/api/comments/repeaters")

@@ -36,7 +36,7 @@ GET {{baseUrl}}/api/comments/by-year
 GET {{baseUrl}}/api/comments/by-day
 
 ### Longest comments
-GET {{baseUrl}}/api/comments/longest?limit=10
+GET {{baseUrl}}/api/comments/longest?limit=5
 
 ### Repeat commenters
 GET {{baseUrl}}/api/comments/repeaters
