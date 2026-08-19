@@ -15,6 +15,9 @@ dist-ssr
 # Scraped comment data — do not send
 api/data/
 
+# Generated slide deck — embeds scraped comment text, keep local
+my-app/longest-comment.html
+
 # Python
 .venv/
 api/.venv/
